@@ -123,8 +123,9 @@ class Sync(Node):
     attr_names = ('configs',)
 
 class PortList(Node):
-    def __init__(self, ports, coord=None):
+    def __init__(self, ports, symtab, coord=None):
         self.ports = ports
+        self.symtab = symtab
         self.coord = coord
 
     def children(self, expand=False):
@@ -136,7 +137,7 @@ class PortList(Node):
             nodelist.append(("ports", list(self.ports) or []))
         return tuple(nodelist)
 
-    attr_names = ()
+    attr_names = ('symtab',)
 
 class Port(Node):
     def __init__(self, name, depth_exp, coord=None):
@@ -299,11 +300,12 @@ class TransOrder(Node):
     attr_names = ()
 
 class Trans(Node):
-    def __init__(self, port, condition, guard, actions, coord=None):
+    def __init__(self, port, condition, guard, actions, symtab, coord=None):
         self.port = port
         self.condition = condition
         self.guard = guard
         self.actions = actions
+        self.symtab = symtab
         self.coord = coord
 
     def children(self, expand=False):
@@ -318,7 +320,7 @@ class Trans(Node):
             nodelist.append(("actions", list(self.actions) or []))
         return tuple(nodelist)
 
-    attr_names = ()
+    attr_names = ('symtab',)
 
 class CondSegmark(Node):
     def __init__(self, depth, coord=None):

@@ -4,6 +4,7 @@ import os
 from . import ast
 from . import coord
 from . import exception as exn
+from . import symtab
 
 precedence = (
     ('left', 'LOR', 'LAND', 'BOR', 'BAND', 'BXOR'),
@@ -16,13 +17,18 @@ precedence = (
 configs = None
 config_nodes = {}
 
+intab = symtab.Symtab(None)
+outtab = symtab.Symtab(None)
+top = symtab.Symtab(None)
+saved = top
+
 def p_sync(p):
     '''
     sync : SYNCH VID LPAREN input_list BOR output_list RPAREN \
            LBRACE decl_list_opt state_list RBRACE
     '''
-    p[0] = ast.Sync(p[2], ast.PortList(p[4]), ast.PortList(p[6]), p[9],
-                    ast.StateList(p[10]), None)
+    p[0] = ast.Sync(p[2], ast.PortList(p[4], intab), ast.PortList(p[6], outtab),
+                    p[9], ast.StateList(p[10]), None)
 
 
 def p_VID(p):
@@ -238,9 +244,22 @@ def p_trans_list(p):
 
 def p_trans_stmt(p):
     '''
-    trans_stmt : VID condition_opt guard_opt action_list
+    trans_stmt : trans_port condition_opt guard_opt action_list
     '''
-    p[0] = ast.Trans(p[1], p[2], p[3], p[4])
+    global saved, top
+    t = ast.Trans(p[1], p[2], p[3], p[4], top)
+    top = saved
+    p[0] = t
+
+
+def p_trans_port(p):
+    '''
+    trans_port : VID
+    '''
+    global saved, top
+    saved = top
+    top = symtab.Symtab(top)
+    p[0] = p[1]
 
 
 def p_condition_opt(p):
@@ -533,7 +552,16 @@ import ply.yacc as yacc
 from . import lexer
 
 
+def init():
+    global intab, outtab, top, saved
+    intab = symtab.Symtab(None)
+    outtab = symtab.Symtab(None)
+    top = symtab.Symtab(None)
+    saved = top
+
+
 def build():
+    init()
     tokens = lexer.tokens
     tab_path = '/tmp/tmp-sync-tab'
     return yacc.yacc(start='sync', debug=0, tabmodule=tab_path)
