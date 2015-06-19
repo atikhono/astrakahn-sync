@@ -25,4 +25,26 @@ class ParseError(Exception):
             return "%s: %s" % (self.coord.linepos(code), self.msg)
 
 
+class DuplicatesError(Exception):
+    '''
+    Symtab duplicate symbol exception.
+    '''
+    def __init__(self, msg, coord, coord_dup):
+        self.msg = msg
+        self.coord = coord
+        self.coord_dup = coord_dup
+
+    def message(self, code):
+        '''
+        Return the error message with the positional information.
+        The message comes in the form:
+
+            "lineno:linepos: message at lineno_dup:linepos_dup"
+
+        linepos and linepos_dup are relative to %code%.
+        '''
+        return "%s: %s at %s" % (self.coord.linepos(code), self.msg,
+                self.coord_dup.linepos(code))
+
+
 class NotImplemented(Exception): pass

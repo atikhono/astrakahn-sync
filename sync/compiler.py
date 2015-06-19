@@ -78,3 +78,5 @@ def process(code, macros={}):
 
     except sync_exn.ParseError as err:
         print(err.message(code))
+    except sync_exn.DuplicatesError as err:
+        print(err.message(code))

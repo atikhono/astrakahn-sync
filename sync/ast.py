@@ -178,8 +178,9 @@ class DepthNone(Node):
     attr_names = ()
 
 class DeclList(Node):
-    def __init__(self, decls, coord=None):
+    def __init__(self, decls, symtab, coord=None):
         self.decls = decls
+        self.symtab = symtab
         self.coord = coord
 
     def children(self, expand=False):
@@ -191,16 +192,32 @@ class DeclList(Node):
             nodelist.append(("decls", list(self.decls) or []))
         return tuple(nodelist)
 
-    attr_names = ()
+    attr_names = ('symtab',)
 
 class StoreVar(Node):
-    def __init__(self, name, coord=None):
+    def __init__(self, name, type, coord=None):
         self.name = name
+        self.type = type
         self.coord = coord
 
     def children(self, expand=False):
         nodelist = []
         if self.name is not None: nodelist.append(("name", self.name))
+        if self.type is not None: nodelist.append(("type", self.type))
+        return tuple(nodelist)
+
+    attr_names = ()
+
+class StoreType(Node):
+    def __init__(self, choice, port, coord=None):
+        self.choice = choice
+        self.port = port
+        self.coord = coord
+
+    def children(self, expand=False):
+        nodelist = []
+        if self.choice is not None: nodelist.append(("choice", self.choice))
+        if self.port is not None: nodelist.append(("port", self.port))
         return tuple(nodelist)
 
     attr_names = ()

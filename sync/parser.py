@@ -5,6 +5,7 @@ from . import ast
 from . import coord
 from . import exception as exn
 from . import symtab
+from . import types
 
 precedence = (
     ('left', 'LOR', 'LAND', 'BOR', 'BAND', 'BXOR'),
@@ -100,6 +101,12 @@ def p_input(p):
     else:
         depth = ast.DepthNone()
 
+    tmp = intab.put(p[1].value,
+            symtab.Entry(type=types.Choice(variants={}, tails=[types.Variable()]), ast=p[1]))
+    if tmp is not None:
+        raise exn.DuplicatesError("Channel '%s' was previously declared" %
+                p[1].value, p[1].coord, tmp.ast.coord)
+
     p[0] = ast.Port(p[1], depth)
 
 
@@ -116,6 +123,12 @@ def p_output(p):
     output : VID
            | VID COLON depth_exp
     '''
+    tmp = outtab.put(p[1].value,
+            symtab.Entry(type=types.Choice(variants={}, tails=[types.Variable()]), ast=p[1]))
+    if tmp is not None:
+        raise exn.DuplicatesError("Channel '%s' was previously declared"
+                % p[1].value, p[1].coord, tmp.ast.coord)
+
     p[0] = ast.Port(p[1], (ast.DepthNone() if len(p) == 2 else p[3]))
 
 
@@ -138,7 +151,7 @@ def p_decl_list_opt(p):
     decl_list_opt : decl_list
                   | empty
     '''
-    p[0] = ast.DeclList(p[1]) if p[1] != '' else ast.DeclList([])
+    p[0] = ast.DeclList(p[1], top) if p[1] != '' else ast.DeclList([], top)
 
 
 def p_decl_list(p):
@@ -150,25 +163,70 @@ def p_decl_list(p):
     p[0] = decl_list
 
 
-def p_decl(p):
+def p_decl_store(p):
     '''
-    decl : STORE id_list SCOLON
-         | STATE type statevar_list SCOLON
+    decl : STORE store_type id_list SCOLON
     '''
-    if len(p) == 4:
-        p[0] = [ast.StoreVar(n) for n in p[2]]
+    for n in p[3]:
+        tmp = top.put(n.value, symtab.Entry(type=types.Record(labels={}, tails=[]), ast=n))
+        if tmp is not None:
+            raise exn.DuplicatesError("Store variable '%s' was previously declared"
+                    % n.value, n.coord, tmp.ast.coord)
+
+    p[0] = [ast.StoreVar(n, p[2]) for n in p[3]]
+
+
+def p_store_type(p):
+    '''
+    store_type : QM VID DOT VID
+               | VID
+    '''
+    if len(p) == 2:
+        p[0] = ast.StoreType(ast.ID('uniq'), p[1])
     else:
-        p[0] = [ast.StateVar(n[0], p[2], n[1]) for n in p[3]]
+        p[0] = ast.StoreType(p[2], p[4])
 
 
-def p_type(p):
+def p_decl_state(p):
     '''
-    type : INT LPAREN VNUMBER RPAREN
-         | ENUM LPAREN id_list RPAREN
+    decl : STATE state_type statevar_list SCOLON
+    '''
+    if isinstance(p[2], ast.IntType):
+        for n in p[3]:
+            tmp = top.put(n[0].value,
+                    symtab.Entry(type=types.Int(p[2].size.value), ast=n[0]))
+            if tmp is not None:
+                raise exn.DuplicatesError("'%s' was previously declared"
+                    % n[0].value, n[0].coord, tmp.ast.coord)
+    else:
+        e = [l.value for l in p[2].labels]
+        for n in p[3]:
+            tmp = top.put(n[0].value,
+                    symtab.Entry(type=types.Enum(e), ast=n[0]))
+            if tmp is not None:
+                raise exn.DuplicatesError("'%s' was previously declared"
+                    % n[0].value, n[0].coord, tmp.ast.coord)
+
+    p[0] = [ast.StateVar(n[0], p[2], n[1]) for n in p[3]]
+
+
+def p_state_type(p):
+    '''
+    state_type : INT LPAREN VNUMBER RPAREN
+               | ENUM LPAREN id_list RPAREN
     '''
     if p[1] == 'int':
         p[0] = ast.IntType(p[3])
     else:
+        for n in p[3]:
+            tmp = top.put(n.value, symtab.Entry(type=types.Int(),
+                ast=ast.IntExp('n0', [],
+                    {'n0': ast.NUMBER(p[3].index(n), coord=n.coord)}),
+                ro=True))
+            if tmp is not None:
+                raise exn.DuplicatesError("'%s' was previously declared"
+                        % n.value, n.coord, tmp.ast.coord)
+
         p[0] = ast.EnumType(p[3])
 
 
@@ -270,8 +328,15 @@ def p_condition_opt(p):
                   | empty
     '''
     if len(p) == 2:
-        p[0] = ast.CondEmpty()
+        p_ast = ast.CondEmpty()
+        top.put('this',
+            symtab.Entry(type=types.Record(labels={}, tails=[]),
+                         ast=p_ast, ro=False))
+        p[0] = p_ast
     else:
+        top.put('this',
+            symtab.Entry(type=types.Record(labels={}, tails=[]),
+                         ast=p[2], ro=False))
         p[0] = p[2]
 
 
@@ -292,9 +357,33 @@ def p_cond_datamsg(p):
         p[0] = ast.CondDataMsg(p[2], [], ast.TERM(None))
 
     elif len(p) == 5:
+        for n in p[2]:
+            tmp = top.put(n.value,
+                    symtab.Entry(type=types.Variable(),#types.Record(labels={n.value:types.Variable()}),
+                                 ast=n, ro=True))
+            if tmp is not None:
+                # tail_opt is parsed earlier than this rule hits
+                if n.value == p[3].value:
+                    raise exn.DuplicatesError("'%s' was previously declared"
+                            % n.value, tmp.ast.coord, n.coord)
+                raise exn.DuplicatesError("'%s' was previously declared"
+                        % n.value, n.coord, tmp.ast.coord)
+
         p[0] = ast.CondDataMsg(ast.TERM(None), p[2], p[3])
 
     elif len(p) == 7:
+        for n in p[4]:
+            tmp = top.put(n.value,
+                    symtab.Entry(type=types.Variable(),#types.Record(labels={n.value:types.Variable()}),
+                                 ast=n, ro=True))
+            if tmp is not None:
+                # tail_opt is parsed earlier than this rule hits
+                if n.value == p[5].value:
+                    raise exn.DuplicatesError("'%s' was previously declared"
+                            % n.value, tmp.ast.coord, n.coord)
+                raise exn.DuplicatesError("'%s' was previously declared"
+                        % n.value, n.coord, tmp.ast.coord)
+
         p[0] = ast.CondDataMsg(p[2], p[4], p[5])
 
 
@@ -303,6 +392,14 @@ def p_tail_opt(p):
     tail_opt : LOR VID
              | empty
     '''
+    if len(p) == 3:
+        tmp = top.put(p[2].value,
+            symtab.Entry(type=types.Variable(),#types.Record(labels={}, tails=[types.Variable()]), #types.Record(labels={p[2].value:types.Variable()}),
+                         ast=p[2], ro=True))
+        if tmp is not None:
+            raise exn.DuplicatesError("'%s' was previously declared"
+                % p[2].value, p[2].coord, tmp.ast.coord)
+
     p[0] = p[2] if len(p) == 3 else ast.TERM(None)
 
 
@@ -348,10 +445,17 @@ def p_assign_list(p):
     p[0] = [p[1]] if len(p) == 2 else p[1] + [p[3]]
 
 
-def p_assign(p):
+def p_assign_int_exp(p):
     '''
     assign : VID ASSIGN int_exp
-           | VID ASSIGN data_exp
+    '''
+    tmp = top.put(p[1].value, symtab.Entry(type=types.Int(), ast=p[3]))
+    p[0] = ast.Assign(p[1], p[3])
+
+
+def p_assign_data_exp(p):
+    '''
+    assign : VID ASSIGN data_exp
     '''
     p[0] = ast.Assign(p[1], p[3])
 
