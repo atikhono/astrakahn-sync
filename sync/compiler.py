@@ -9,6 +9,7 @@ from . import lexer as sync_lexer
 from . import parser as sync_parser
 from . import exception as sync_exn
 from . import intab as sync_intab
+from . import outtab as sync_outtab
 
 def macro_subst(code, macros):
     code_final = ''
@@ -81,4 +82,5 @@ def process(code, macros={}):
     #    print(err.message(code))
 
     sync_intab.build(sync_ast)
+    sync_outtab.build(sync_ast)
     return sync_ast

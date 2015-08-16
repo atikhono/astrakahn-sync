@@ -91,6 +91,11 @@ class Record(Term):
             if t not in self.tails:
                 self.tails.append(t)
 
+    def update(self, other):
+        assert(isinstance(other, Record))
+        for l in other.labels:
+            self.labels[l] = other.labels[l]
+
         for t in other.tails:
             if t not in self.tails:
                 self.tails.append(t)

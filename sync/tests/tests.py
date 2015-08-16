@@ -10,6 +10,7 @@ suite = unittest.TestLoader().loadTestsFromNames(
         [
             'test_parser',
             'test_intab',
+            'test_outtab',
         ]
     )
 
