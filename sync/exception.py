@@ -47,4 +47,8 @@ class DuplicatesError(Exception):
                 self.coord_dup.linepos(code))
 
 
+class NotDeclaredError(ParseError): pass
+class NotAssignableError(DuplicatesError): pass
+class TypeError(DuplicatesError): pass
+
 class NotImplemented(Exception): pass

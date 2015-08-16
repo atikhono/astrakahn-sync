@@ -8,6 +8,7 @@ import re
 from . import lexer as sync_lexer
 from . import parser as sync_parser
 from . import exception as sync_exn
+from . import intab as sync_intab
 
 def macro_subst(code, macros):
     code_final = ''
@@ -72,11 +73,12 @@ def parse(code, macros={}):
 
 
 def process(code, macros={}):
-    try:
-        sync_ast = parse(code, macros)
-        return sync_ast
+    #try:
+    sync_ast = parse(code, macros)
+    #except sync_exn.ParseError as err:
+    #    print(err.message(code))
+    #except sync_exn.DuplicatesError as err:
+    #    print(err.message(code))
 
-    except sync_exn.ParseError as err:
-        print(err.message(code))
-    except sync_exn.DuplicatesError as err:
-        print(err.message(code))
+    sync_intab.build(sync_ast)
+    return sync_ast
