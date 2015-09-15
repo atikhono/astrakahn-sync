@@ -2,7 +2,8 @@
 
 import os
 from . import ast
-
+from . import coord
+from . import exception as exn
 
 precedence = (
     ('left', 'LOR', 'LAND', 'BOR', 'BAND', 'BXOR'),
@@ -28,11 +29,12 @@ def p_VID(p):
     '''
     VID : ID
     '''
+    c = coord.Coord(p.lineno(1), p.lexpos(1))
     if p[1] in configs:
-        term = ast.ID(configs[p[1]])
+        term = ast.ID(configs[p[1]], coord=c)
         config_nodes[p[1]].append(term)
     else:
-        term = ast.ID(p[1])
+        term = ast.ID(p[1], coord=c)
     p[0] = term
 
 
@@ -56,11 +58,12 @@ def p_VTERM(p):
     '''
     VTERM : ID
     '''
+    c = coord.Coord(p.lineno(1), p.lexpos(1))
     if p[1] in configs:
-        term = ast.TERM(configs[p[1]])
+        term = ast.TERM(configs[p[1]], coord=c)
         config_nodes[p[1]].append(term)
     else:
-        term = ast.ID(p[1])
+        term = ast.ID(p[1], coord=c)
     p[0] = term
 
 
@@ -176,7 +179,8 @@ def p_statevar(p):
     statevar : ID
              | ID ASSIGN VNUMBER
     '''
-    p[0] = (ast.ID(p[1]), ast.NUMBER(0) if len(p) == 2 else p[3])
+    c = coord.Coord(p.lineno(1), p.lexpos(1))
+    p[0] = (ast.ID(p[1], coord=c), ast.NUMBER(0) if len(p) == 2 else p[3])
 
 
 def p_state_list(p):
@@ -519,10 +523,10 @@ def p_exp_term(p):
 
 def p_error(p):
     if p:
-        print("Syntax error at '%s'" % p.value, p.lineno, ':', p.lexpos)
+        raise exn.ParseError("Syntax error at '%s'"
+                % p.value, coord.Coord(p.lineno, p.lexpos))
     else:
-        print("Syntax error at EOF")
-    quit()
+        raise exn.ParseError("Syntax error")
 
 
 import ply.yacc as yacc

@@ -7,7 +7,7 @@ import re
 
 from . import lexer as sync_lexer
 from . import parser as sync_parser
-
+from . import exception as sync_exn
 
 def macro_subst(code, macros):
     code_final = ''
@@ -69,3 +69,12 @@ def parse(code, macros={}):
     sync_ast.configs = sync_parser.config_nodes
 
     return sync_ast
+
+
+def process(code, macros={}):
+    try:
+        sync_ast = parse(code, macros)
+        return sync_ast
+
+    except sync_exn.ParseError as err:
+        print(err.message(code))
